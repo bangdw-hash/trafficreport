@@ -21,8 +21,8 @@ $('cloudSync').onclick=()=>run(sync);$('cloudLoad').onclick=()=>run(pull);$('clo
 
 window.trafficreportReverseGeocode=async(lat,lon)=>{
  const {data:{session}}=await db.auth.getSession();
- if(!session?.access_token)throw Error('주소 자동 변환을 사용하려면 먼저 클라우드 계정에 로그인하십시오.');
+ if(!session?.access_token){document.querySelector('.cloud-panel')?.setAttribute('open','');document.querySelector('.cloud-panel')?.scrollIntoView({behavior:'smooth',block:'start'});throw Error('클라우드 로그인 필요: 아래 펼쳐진 계정 영역에서 로그인한 후 다시 눌러주십시오.');}
  const r=await fetch(URL+'/functions/v1/trafficreport-reverse-geocode',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token,'apikey':KEY},body:JSON.stringify({lat:Number(lat),lon:Number(lon)})});
- const j=await r.json();if(!r.ok)throw Error(j.error||'주소 조회 실패');return j;
+ const j=await r.json().catch(()=>({error:'서버 응답을 읽을 수 없습니다.'}));if(!r.ok)throw Error((j.error||'주소 조회 실패')+' (HTTP '+r.status+')');return j;
 };
 db.auth.onAuthStateChange(()=>{refresh().catch(()=>{})});refresh().catch(e=>status(e.message));
