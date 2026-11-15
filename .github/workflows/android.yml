@@ -1,12 +1,15 @@
-name: Build Android APK
+name: Build and publish Android APK
 on:
   push:
     branches: [main]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
+concurrency:
+  group: android-release
+  cancel-in-progress: false
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,8 +21,26 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - run: gradle :app:assembleDebug --no-daemon
+      - name: Assemble Android APK
+        run: gradle :app:assembleDebug --no-daemon -PbuildVersionCode=${{ github.run_number }}
+      - name: Prepare stable filename
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk trafficreport-latest.apk
+          test -s trafficreport-latest.apk
+          sha256sum trafficreport-latest.apk > trafficreport-latest.apk.sha256
       - uses: actions/upload-artifact@v4
         with:
-          name: trafficreport-v0.1.0-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: trafficreport-build-${{ github.run_number }}
+          path: |
+            trafficreport-latest.apk
+            trafficreport-latest.apk.sha256
+      - name: Publish stable direct download on GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest trafficreport-latest.apk trafficreport-latest.apk.sha256 --clobber
+            gh release edit latest --title "손끝 교통신고 AI 최신 테스트 APK (빌드 ${{ github.run_number }})" --notes "자동 빌드 ${{ github.run_number }} / 커밋 ${{ github.sha }}. 테스트용 debug APK입니다. CI 실행마다 서명키가 달라질 수 있어 기존 설치본 위에 업데이트되지 않을 수 있습니다."
+          else
+            gh release create latest trafficreport-latest.apk trafficreport-latest.apk.sha256 --target "${{ github.sha }}" --title "손끝 교통신고 AI 최신 테스트 APK (빌드 ${{ github.run_number }})" --notes "자동 빌드 ${{ github.run_number }} / 커밋 ${{ github.sha }}. 테스트용 debug APK입니다. CI 실행마다 서명키가 달라질 수 있어 기존 설치본 위에 업데이트되지 않을 수 있습니다." --latest
+          fi
