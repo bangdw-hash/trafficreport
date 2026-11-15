@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '17 0 * * *'
 permissions:
   contents: write
 concurrency:
@@ -29,7 +31,13 @@ jobs:
           test -f app/src/main/AndroidManifest.xml
           test -f web/index.html
       - name: Assemble Android APK
-        run: gradle :app:assembleDebug --no-daemon -PbuildVersionCode=${{ github.run_number }}
+        run: gradle :app:assembleDebug --no-daemon --stacktrace -PbuildVersionCode=${{ github.run_number }}
+      - name: Check APK package and signing
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          "${ANDROID_HOME}/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | head -n 4
+          "${ANDROID_HOME}/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+
       - name: Prepare stable filename
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk trafficreport-latest.apk
@@ -52,3 +60,6 @@ jobs:
             gh release create latest trafficreport-latest.apk trafficreport-latest.apk.sha256 --target "${{ github.sha }}" --title "손끝 교통신고 AI 최신 테스트 APK (빌드 ${{ github.run_number }})" --notes "자동 빌드 ${{ github.run_number }} / 커밋 ${{ github.sha }}. 테스트용 debug APK입니다. CI 실행마다 서명키가 달라질 수 있어 기존 설치본 위에 업데이트되지 않을 수 있습니다." --latest
           fi
           gh release view latest --json assets --jq '.assets[].name' | grep -Fx trafficreport-latest.apk
+          curl --fail --location --retry 5 --retry-delay 3 --output /tmp/trafficreport-verify.apk "https://github.com/${{ github.repository }}/releases/download/latest/trafficreport-latest.apk"
+          cmp trafficreport-latest.apk /tmp/trafficreport-verify.apk
+          echo "Verified direct APK download and checksum."
