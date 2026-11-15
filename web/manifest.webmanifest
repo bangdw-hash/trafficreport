@@ -1,9 +1,20 @@
 {
+  "id": "/trafficreport/",
   "name": "손끝 교통신고 AI",
   "short_name": "교통신고",
-  "start_url": "./",
+  "description": "교통위반 영상 증거 정리와 신고서 작성",
+  "start_url": "./?source=pwa",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f1f5f9",
   "theme_color": "#147bb7",
-  "lang": "ko"
+  "lang": "ko-KR",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
