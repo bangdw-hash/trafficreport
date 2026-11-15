@@ -18,4 +18,11 @@ $('cloudLogin').onclick=()=>run(async()=>{const email=$('cloudEmail').value.trim
 $('cloudSignup').onclick=()=>run(async()=>{const email=$('cloudEmail').value.trim(),password=$('cloudPassword').value;if(password.length<8)throw Error('비밀번호는 8자 이상 입력하십시오.');const {data,error}=await db.auth.signUp({email,password});$('cloudPassword').value='';if(error)throw error;await refresh();status(data.session?'가입 및 로그인 완료':'가입 요청 완료. 이메일 인증 후 로그인하십시오.')});
 $('cloudLogout').onclick=()=>run(async()=>{const {error}=await db.auth.signOut();if(error)throw error;await refresh();status('로그아웃했습니다. 기기에 남은 기록은 자동 삭제되지 않습니다.')});
 $('cloudSync').onclick=()=>run(sync);$('cloudLoad').onclick=()=>run(pull);$('cloudUploadAudio').onclick=()=>run(upload);
+
+window.trafficreportReverseGeocode=async(lat,lon)=>{
+ const {data:{session}}=await db.auth.getSession();
+ if(!session?.access_token)throw Error('주소 자동 변환을 사용하려면 먼저 클라우드 계정에 로그인하십시오.');
+ const r=await fetch(URL+'/functions/v1/trafficreport-reverse-geocode',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token,'apikey':KEY},body:JSON.stringify({lat:Number(lat),lon:Number(lon)})});
+ const j=await r.json();if(!r.ok)throw Error(j.error||'주소 조회 실패');return j;
+};
 db.auth.onAuthStateChange(()=>{refresh().catch(()=>{})});refresh().catch(e=>status(e.message));
