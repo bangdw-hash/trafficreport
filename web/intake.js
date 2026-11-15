@@ -1,6 +1,6 @@
 (()=>{'use strict';
 const el=id=>document.getElementById(id), KEY='trafficreport-intakes-v1';let activeId=null,recorder=null,stream=null,chunks=[],recognition=null,recordingId=null;
-const fields=['At','Lat','Lon','Accuracy','Road','Jibun','Place','Type','Plate','Transcript','Draft'];
+const fields=['At','Lat','Lon','Accuracy','Road','Jibun','Zip','Place','Type','Plate','Transcript','Draft'];
 const nowLocal=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,19)};
 function load(){try{const a=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(a)?a:[]}catch{return[]}}
 function setStatus(s){el('intakeStatus').textContent=s}
@@ -18,4 +18,24 @@ async function voice(){if(recorder&&recorder.state==='recording'){await stop();r
 function polish(){const t=el('intakeTranscript').value.trim();if(!t){setStatus('먼저 음성 인식 원문 또는 내용을 입력하십시오.');return}const when=el('intakeAt').value.replace('T',' '),where=el('intakePlace').value||el('intakeRoad').value||'장소 미확인';el('intakeDraft').value='발생 일시: '+when+'\n발생 장소: '+where+'\n신고 유형: '+el('intakeType').value+'\n차량번호: '+(el('intakePlate').value||'미확인')+'\n사건 내용(원문 기반, 사실 확인 필요): '+t.replace(/\s+/g,' ').replace(/([.!?])(?=\S)/g,'$1 ')+'\n\n※ AI 문장 교정이 아닌 규칙 기반 초안입니다. 제출 전 사실관계를 직접 확인하십시오.';save()}
 function findVideo(){const o=save();if(!o)return;const dt=new Date(o.at);if(!Number.isFinite(dt.getTime())){setStatus('발생시각을 입력하십시오.');return}el('searchDate').value=o.at.slice(0,10);el('searchTime').value=o.at.slice(11,16);show('media');if(typeof engine!=='undefined'&&engine.files.length){const t=dt.getTime(),hits=engine.files.filter(f=>f.start&&f.start.getTime()<=t+300000&&f.start.getTime()+(f.duration||60)*1000>=t-300000);renderResults(hits);el('matchStatus').textContent='사건 시각 전후 5분 검색: '+hits.length+'개 영상'}else el('matchStatus').textContent='사건 시각을 입력했습니다. 블랙박스 폴더를 선택한 뒤 영상을 검색하십시오.'}
 function toReport(){const o=save();if(!o)return;el('field-date').value=o.at.slice(0,10);el('field-time').value=o.at.slice(11,16);el('field-location').value=o.place||o.road||o.jibun||[o.lat,o.lon].filter(Boolean).join(', ');el('field-plate').value=o.plate;el('field-content').value=(o.draft||o.transcript||'').slice(0,900);show('report');setStatus('신고서에 사전등록 내용을 반영했습니다. 제출 전 검토하십시오.')}
+
+function openPostcode(){
+ const panel=el('intakePostcodePanel'),close=el('intakePostcodeClose');
+ if(!window.kakao?.Postcode){setStatus('주소 검색 서비스를 불러오지 못했습니다. 인터넷 연결이나 브라우저 차단 설정을 확인하십시오.');return}
+ panel.classList.remove('hidden');close.classList.remove('hidden');panel.replaceChildren();
+ new window.kakao.Postcode({
+  oncomplete:data=>{
+   el('intakeZip').value=String(data.zonecode||'').slice(0,5);
+   el('intakeRoad').value=String(data.roadAddress||data.address||'').slice(0,250);
+   el('intakeJibun').value=String(data.jibunAddress||'').slice(0,250);
+   panel.classList.add('hidden');close.classList.add('hidden');
+   save();setStatus('주소 및 우편번호를 저장했습니다. 사건이 실제 발생한 위치인지 확인하십시오.');
+  },
+  onresize:size=>{panel.style.height=Math.max(440,Math.min(size.height+10,680))+'px'},
+  width:'100%',height:'460px',autoClose:false
+ }).embed(panel,{autoClose:false});
+ panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+el('intakePostcodeSearch').onclick=openPostcode;
+el('intakePostcodeClose').onclick=()=>{el('intakePostcodePanel').classList.add('hidden');el('intakePostcodeClose').classList.add('hidden')};
 el('intakeNew').onclick=newIncident;el('intakeSave').onclick=save;el('intakeGps').onclick=gps;el('intakeAddress').onclick=reverse;el('intakeVoice').onclick=voice;el('intakePolish').onclick=polish;el('intakeVideo').onclick=findVideo;el('intakeReport').onclick=toReport;window.addEventListener('pagehide',()=>{if(recorder?.state==='recording')recorder.stop();stream?.getTracks().forEach(t=>t.stop())});render();})();
